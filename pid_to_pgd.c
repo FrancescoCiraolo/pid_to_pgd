@@ -5,13 +5,15 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <linux/slab.h>
+#include <asm/pgtable-types.h>
+#include <linux/pgtable.h>
 
 #define BUFSIZE  100
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Francesco Ciraolo");
 
-static pgd_t *pgd;
+static pgd_t pgd;
 
 static struct proc_dir_entry *ent;
 
@@ -35,7 +37,15 @@ static ssize_t pidread(struct file *file, const char __user *ubuf, size_t count,
 
     pid_struct = find_get_pid(p_id);
     task = pid_task(pid_struct, PIDTYPE_PID);
-    pgd = task->mm->pgd;
+
+//    pgd = task->mm->pgd;
+
+    pgd_t* pgd_p = pgd_offset(task->mm, 0);
+    pgd = READ_ONCE(*pgd_p);
+
+//    printk("%p\n", pgd);
+    printk("%llx\n", pgd_val(pgd));
+//    printk("%p\n", *pgd);
 
     *ppos = strlen(buf);
 
