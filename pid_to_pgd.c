@@ -5,7 +5,6 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <linux/slab.h>
-#include <asm/pgtable-types.h>
 #include <linux/pgtable.h>
 
 #define BUFSIZE  100
@@ -13,13 +12,14 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Francesco Ciraolo");
 
-static pgd_t pgd;
+unsigned long pgd_addr;
 
 static struct proc_dir_entry *ent;
 
 static ssize_t pidread(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos) {
 
     char buf[BUFSIZE];
+
     long unsigned int p_id;
     struct pid *pid_struct;
     struct task_struct *task;
@@ -38,21 +38,19 @@ static ssize_t pidread(struct file *file, const char __user *ubuf, size_t count,
     pid_struct = find_get_pid(p_id);
     task = pid_task(pid_struct, PIDTYPE_PID);
 
-//    pgd = task->mm->pgd;
+    if (p_id != task->pid) {
+        printk("Can't retrieve process with pid: %lu\n", p_id);
+        return -ESRCH;
+    }
 
-    pgd_t* pgd_p = pgd_offset(task->mm, 0);
-    pgd = READ_ONCE(*pgd_p);
-
-//    printk("%p\n", pgd);
-    printk("%llx\n", pgd_val(pgd));
-//    printk("%p\n", *pgd);
+    pgd_addr = virt_to_phys(task->mm->pgd);
 
     *ppos = strlen(buf);
 
     return sizeof(buf);
 }
 
-static ssize_t pidwrite(struct file *file, char __user *ubuf,size_t count, loff_t *ppos) {
+static ssize_t pgdwrite(struct file *file, char __user *ubuf,size_t count, loff_t *ppos) {
     int len;
 
     char buf[BUFSIZE];
@@ -60,8 +58,7 @@ static ssize_t pidwrite(struct file *file, char __user *ubuf,size_t count, loff_
     if(*ppos > 0 || count < BUFSIZE)
         return 0;
 
-
-    len = sprintf(buf,"%p\n", pgd);
+    len = sprintf(buf,"%lx\n", pgd_addr);
 
     if(copy_to_user(ubuf,buf,len))
         return -EFAULT;
@@ -75,7 +72,7 @@ static ssize_t pidwrite(struct file *file, char __user *ubuf,size_t count, loff_
 static int init(void) {
 
     static struct proc_ops ops = {
-            .proc_read = pidwrite,
+            .proc_read = pgdwrite,
             .proc_write = pidread
     };
 
