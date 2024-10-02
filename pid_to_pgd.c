@@ -24,13 +24,13 @@ static ssize_t pidread(struct file *file, const char __user *ubuf, size_t count,
     struct pid *pid_struct;
     struct task_struct *task;
 
-    if (*ppos > 0 || count > BUFSIZE)
+    if (*ppos > 0 || count >= BUFSIZE)
         return -EFAULT;
 
     if (copy_from_user(buf, ubuf, count))
         return -EFAULT;
 
-    buf[count - 1] = 0;
+    buf[count] = 0;
 
     if (kstrtoul(buf, 0, &p_id))
         return -EFAULT;
@@ -47,7 +47,7 @@ static ssize_t pidread(struct file *file, const char __user *ubuf, size_t count,
 
     *ppos = strlen(buf);
 
-    return sizeof(buf);
+    return *ppos;
 }
 
 static ssize_t pgdwrite(struct file *file, char __user *ubuf,size_t count, loff_t *ppos) {
